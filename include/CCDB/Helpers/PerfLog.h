@@ -46,7 +46,7 @@ namespace ccdb{
     private:
         ccdb::StopWatch _sw{};
         std::string _name;
-        std::chrono::high_resolution_clock::time_point _startTime;
+        std::chrono::steady_clock::time_point _startTime;
 
     };
 

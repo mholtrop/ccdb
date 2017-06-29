@@ -3,9 +3,11 @@
 #include <stdlib.h>
 #include <iostream>
 #include <sstream>
+#include <memory>
 #include <time.h>
 #include <string.h>
 #include <limits.h>
+#include <algorithm>
 
 
 #include "CCDB/Globals.h"
@@ -869,16 +871,16 @@ Variation* ccdb::SQLiteDataProvider::GetVariation( const string& name )
     ClearErrors(); //Clear error in function that can produce new ones
 
     //check that maybe we have this variation id by the last request?
-    if(mLastVariation!=NULL && name == mLastVariation->GetName()) return mLastVariation;
+    //if(mLastVariation!= nullptr && name == mLastVariation->GetName()) return mLastVariation;
 
     string query = "SELECT `id`, `parentId`, `name` FROM `variations` WHERE `name`= ?1";
 
 	// prepare the SQL statement from the command line
-	int result = sqlite3_prepare_v2(mDatabase, query.c_str(), -1, &mStatement, 0);
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	int result = sqlite3_prepare_v2(mDatabase, query.c_str(), -1, &mStatement, nullptr);
+	if( result != 0) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
 
 	result = sqlite3_bind_text(mStatement, 1, name.c_str(), -1, SQLITE_TRANSIENT);
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return nullptr; }
 
 	mQueryColumns = sqlite3_column_count(mStatement);
     //select variation
@@ -1010,108 +1012,129 @@ Assignment* ccdb::SQLiteDataProvider::GetAssignmentShort(int run, const string& 
 	if(!CheckConnection(thisFunc)) return NULL;
 	
     //Get type table
-    ConstantsTypeTable *table = GetConstantsTypeTable(path, loadColumns);
-    if(!table)
+    unique_ptr<ConstantsTypeTable> table (GetConstantsTypeTable(path, loadColumns));
+    if(table == nullptr)
     {
         Error(CCDB_ERROR_NO_TYPETABLE, "SQLiteDataProvider::GetAssignmentShort", "Type table was not found: '"+path+"'" );
-        return NULL;
+        return nullptr;
     }
     
     //get variation
-    Variation* variation = GetVariation(variationName);
-    if(!variation)
+
+    unique_ptr<Variation> variation(GetVariation(variationName));
+    if(variation == nullptr)
     {
         Error(CCDB_ERROR_VARIATION_INVALID,"SQLiteDataProvider::GetAssignmentShort", "No variation '"+variationName+"' was found");
-        return NULL;
+        return nullptr;
     }
+
+    // Do we have timing?
+    string timeWherePart = time > 0 ?
+                             string("AND  `assignments`.`created` <= datetime(?4, 'unixepoch', 'localtime') "):
+                             string();
 
 	////ok now we must build our mighty query...
 	string query(
-        "SELECT `assignments`.`id` AS `asId`, "
-        "`constantSets`.`vault` AS `blob` "
-        "FROM  `assignments` "
-        "INNER JOIN `runRanges` ON `assignments`.`runRangeId`= `runRanges`.`id` "
-        "INNER JOIN `constantSets` ON `assignments`.`constantSetId` = `constantSets`.`id` "
-        "INNER JOIN `typeTables` ON `constantSets`.`constantTypeId` = `typeTables`.`id` "
-        "WHERE  `runRanges`.`runMin` <= ?1 "
-        "AND `runRanges`.`runMax` >= ?1 "
-        "AND `assignments`.`variationId`= ?2 "
-        "AND  `constantSets`.`constantTypeId` =?3 " + 
-        ((time>0)? string("AND  `assignments`.`created` <= datetime(?4, 'unixepoch', 'localtime') ") : string()) +
-        "ORDER BY `assignments`.`id` DESC "
-        "LIMIT 1 ");
-	
-//	cout<<query<<endl;
+            "SELECT "
+                    "`assignments`.`id` AS `asId`, "
+                    "`assignments`.`variationId` AS `varId`, "
+                    "`constantSets`.`vault` AS `blob` "
+            "FROM `assignments` "
+                    "INNER JOIN `runRanges` ON `assignments`.`runRangeId`= `runRanges`.`id` "
+                    "INNER JOIN `constantSets` ON `assignments`.`constantSetId` = `constantSets`.`id` "
+                    "INNER JOIN `typeTables` ON `constantSets`.`constantTypeId` = `typeTables`.`id` "
+            "WHERE "
+                    " `runRanges`.`runMin` <= ?1 "
+                    "AND `runRanges`.`runMax` >= ?1 "
+                    // "AND `assignments`.`variationId`= ?2 "
+                    "AND  `constantSets`.`constantTypeId` =?2 "
+                    + timeWherePart);
 
 	// prepare the SQL statement from the command line
-	int result = sqlite3_prepare_v2(mDatabase, query.c_str(), -1, &mStatement, 0);
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	int result = sqlite3_prepare_v2(mDatabase, query.c_str(), -1, &mStatement, nullptr);
+	if( result != SQLITE_OK) {
+        ComposeSQLiteError(thisFunc);
+        sqlite3_finalize(mStatement);
+        return nullptr;
+    }
 
 	result = sqlite3_bind_int(mStatement, 1, run);	/*`directoryId`*/
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	if( result != SQLITE_OK) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return nullptr; }
 	
-	result = sqlite3_bind_int(mStatement, 2, variation->GetId());	/*`variationId`*/
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	//result = sqlite3_bind_int(mStatement, 2, variation->GetId());	/*`variationId`*/
+	//if( result != SQLITE_OK ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return nullptr; }
 			
-	result = sqlite3_bind_int(mStatement, 3, table->GetId());	/*``typeTables`.`directoryId``*/
-	if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+	result = sqlite3_bind_int(mStatement, 2, table->GetId());	/*``typeTables`.`directoryId``*/
+	if( result != SQLITE_OK) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return nullptr; }
     
     if(time>0)
     {
-        result = sqlite3_bind_int64(mStatement, 4, time);	/*` `assignments`.`created``*/
-        if( result ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return NULL; }
+        result = sqlite3_bind_int64(mStatement, 3, time);	/*` `assignments`.`created``*/
+        if( result != SQLITE_OK ) { ComposeSQLiteError(thisFunc); sqlite3_finalize(mStatement); return nullptr; }
     }
 	//cout<<endl<<"time "<<time<<endl;
 	mQueryColumns = sqlite3_column_count(mStatement);
-    int selectedRows = 0;
+
 	// execute the statement
-	Assignment *assignment = NULL;
+    vector<unique_ptr<Assignment>> assignments;
 	do
 	{
 		result = sqlite3_step(mStatement);
-		
+        unique_ptr<Assignment> assignment(new Assignment());
 		switch( result )
 		{
-		case SQLITE_DONE:
-			break;
-		case SQLITE_ROW:
-			assignment = new Assignment(this, this);
-			assignment->SetId( ReadIndex(0) );			
-			assignment->SetRawData( ReadString(1) );
+            case SQLITE_DONE:
+                break;
+		    case SQLITE_ROW:
 
-			//additional fill
-			assignment->SetRequestedRun(run);
-            selectedRows++;
-			break;
-		default:
-			ComposeSQLiteError(thisFunc); 
-            sqlite3_finalize(mStatement); 
-            return NULL;
-			break;
+			    assignment->SetId( ReadIndex(0) );
+                assignment->SetVariationId((unsigned int) ReadIndex(1));
+                assignment->SetRawData( ReadString(2) );
+
+			    //additional fill
+			    assignment->SetRequestedRun(run);
+                assignments.push_back(std::move(assignment));
+    			break;
+	    	default:
+		    	ComposeSQLiteError(thisFunc);
+                sqlite3_finalize(mStatement);
+                return nullptr;
 		}
-	} while(result==SQLITE_ROW );
+	} while(result == SQLITE_ROW );
 
     // finalize the statement to release resources
     sqlite3_finalize(mStatement);
         
-    //If We have not found data for this variation, getting data for parent variation
-    if((assignment == NULL && selectedRows==0) && variation->GetParentDbId()!=0)
-    {
-        return GetAssignmentShort(run, path, time, variation->GetParent()->GetName(), loadColumns);
+    //No data selected
+    if(assignments.empty()) {
+        return nullptr;
     }
-    
-	if(assignment == NULL) 
-	{
-		delete table;
-		return NULL;
-	}
 
+    vector<unique_ptr<Assignment>> selected;
+    for(int i=0; i < assignments.size(); i++)
+    {
+        if(assignments[i]->GetVariationId() == variation->GetId()) {
+            selected.push_back(std::move(assignments[i]));
+        }
+    }
 
+    if(selected.empty()) {
+        return nullptr;
+    }
 
-    assignment->SetTypeTable(table);
-    assignment->BeOwner(table);
-    table->SetOwner(assignment);
+    sort(selected.begin(), selected.end(),
+         [ ]( const unique_ptr<Assignment>& lhs, const unique_ptr<Assignment>& rhs )
+         {
+            return lhs->GetId() > rhs->GetId();     // descending order
+         }
+    );
 
+    auto assignment = selected[0].release();
+
+    auto tablePtr = table.release();
+    assignment->SetTypeTable(tablePtr);
+    assignment->BeOwner(tablePtr);
+    tablePtr->SetOwner(assignment);
 
 	return assignment;
 }

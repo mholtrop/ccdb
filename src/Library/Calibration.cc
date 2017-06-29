@@ -581,7 +581,7 @@ string Calibration::GetConnectionString() const
 
 
 //______________________________________________________________________________
-    shared_ptr<Assignment> Calibration::GetAssignment(const string& namepath, bool loadColumns /*=true*/)
+shared_ptr<Assignment> Calibration::GetAssignment(const string& namepath, bool loadColumns /*=true*/)
 {
     /** @brief Gets the assignment from provider using namepath
      * namepath is the common ccdb request; @see GetCalib
@@ -592,7 +592,7 @@ string Calibration::GetConnectionString() const
      * @return   DAssignment *
      */
 
-    auto pl = PerfLog("Calibration::GetAssignment=>" + namepath );
+    auto pl = PerfLog("GetAssignment=>" + namepath );
     static std::map<std::string, shared_ptr<Assignment>> cache;
 
 	UpdateActivityTime();

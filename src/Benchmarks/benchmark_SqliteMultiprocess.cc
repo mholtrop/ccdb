@@ -61,7 +61,7 @@ int main()
 
     for(int i=0; i<1000; i++) {
         result.clear();
-        con->GetCalib(result, tableName[tableRandom(rd)]);
+        con->GetCalib(result, tableName[0]);
         sum+=result[0][0];
     }
 
