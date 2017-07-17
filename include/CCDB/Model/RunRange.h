@@ -9,19 +9,13 @@
 #define _DRunRange_
 
 #include <string>
-#include "CCDB/Model/StoredObject.h"
 using namespace std;
 
 namespace ccdb {
 
-class RunRange: public StoredObject
+class RunRange
 {
 public:
-	RunRange();
-	RunRange(ObjectsOwner * owner, DataProvider *provider=NULL);
-
-	virtual ~RunRange();
-	
 	int			GetId() const;		//! Database id
 	int			GetMax() const;		///
 	int			GetMin() const;
@@ -50,9 +44,7 @@ private:
 	time_t mModifiedTime;
 	
 	int mId;	//Database ID of the object
-	
-	RunRange(const RunRange& rhs);	
-	RunRange& operator=(const RunRange& rhs);
+
 };
 
 }

@@ -11,15 +11,13 @@
 #include <time.h>
 #include <string>
 #include "CCDB/Globals.h"
-#include "CCDB/Model/StoredObject.h"
-//#include "Model/ConstantsTypeTable.h"
 
 using namespace std;
 
 namespace ccdb {
 class ConstantsTypeTable;
 
-class ConstantsTypeColumn: public StoredObject {
+class ConstantsTypeColumn {
 	friend class ConstantsTypeTable;
 public:
 	enum ColumnTypes
@@ -61,8 +59,7 @@ public:
 	 */
 	static string  TypeToString(ColumnTypes val);
 
-	ConstantsTypeColumn(ObjectsOwner * owner=NULL, DataProvider *provider=NULL);	///Constructor
-	virtual ~ConstantsTypeColumn();					///Destructor
+	ConstantsTypeColumn();	///Constructor
 
 	dbkey_t			GetId() const;						///get database table uniq id;
 	void			SetId(dbkey_t val);					///set database table uniq id;
@@ -117,8 +114,6 @@ public:
 	void			SetType(string val);				///Sets type of column
 	void			SetType(ColumnTypes val);			///Sets type of column
 
-	ConstantsTypeTable * GetTypeTable() const;
-	void SetTypeTable(ConstantsTypeTable * val);
 	unsigned int GetOrder() const { return mOrder; }
 	//The compare operations must be predefined to use the std::sort function 
 	bool operator<(ConstantsTypeColumn rhs) { return mOrder < rhs.mOrder; }

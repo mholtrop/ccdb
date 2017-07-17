@@ -5,8 +5,6 @@
 #include <queue>
 #include <map>
 
-#include "CCDB/Console.h"
-
 namespace ccdb {
 
 class CCDBError {

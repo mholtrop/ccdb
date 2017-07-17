@@ -20,7 +20,7 @@ std::string ccdb::StringUtils::Decode(const string& source )
     string rs = source;
 
     // Replace each matching token in turn
-    for ( size_t i = 0; i < array_length( gHTMLReplaceCodes ); i++ ) {
+    for (size_t i = 0; i < array_length( gHTMLReplaceCodes ); i++) {
         // Find the first match
         const string& match = gHTMLReplaceCodes[i].replace;
         const string& repl = gHTMLReplaceCodes[i].match;
@@ -424,21 +424,21 @@ void ccdb::StringUtils::LexicalSplit( std::vector<string>& tokens, const std::st
     * 
     * @remark
     * Handling inconsistencies and errors while readout parse time:
-    *  ?  No ending quote . If no ending “ is found, string value will be taken
+    *  ?  No ending quote . If no ending ï¿½ is found, string value will be taken
     *     until the end of line.
     *  ?  Comment inside a string. Comment symbol inside the line is ignored. 
-    *     So if you have a record in the file “info #4” it will be read just
-    *     as “info #4” string
+    *     So if you have a record in the file ï¿½info #4ï¿½ it will be read just
+    *     as ï¿½info #4ï¿½ string
     *  ?  Sticked string. In case of there is no spaces between symbols and
     *     an quotes, all will be merged as one string. I.e.:
     *     John" Smith" will be parsed as one value: "John Smith"
     *     John" "Smith will be parsed as one value: "John Smith"
     *     but be careful(!) not to forget to do a spaces between columns
-    *     5.14”Smith” will be parsed as one value “5.14Smith” that probably would
+    *     5.14ï¿½Smithï¿½ will be parsed as one value ï¿½5.14Smithï¿½ that probably would
     *     lead to errors if these were two different columns
-    *  ?  If data contains string fields they are taken into “...” characters. All “
-    *     inside string should be saved by \” symbol. All words and symbols
-    *     inside “...” will be interpreted as string entity.
+    *  ?  If data contains string fields they are taken into ï¿½...ï¿½ characters. All ï¿½
+    *     inside string should be saved by \ï¿½ symbol. All words and symbols
+    *     inside ï¿½...ï¿½ will be interpreted as string entity.
     *
     */
     //clear output

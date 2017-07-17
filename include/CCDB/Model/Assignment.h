@@ -1,20 +1,15 @@
-/*
- * Assignment.h
- */
-
 #ifndef _DAssignment_
 #define _DAssignment_
 
 #include <vector>
 #include <map>
 
-#include "CCDB/Model/StoredObject.h"
-#include "CCDB/Model/ObjectsOwner.h"
 #include "CCDB/Model/ConstantsTypeTable.h"
 #include "CCDB/Model/ConstantsTypeColumn.h"
 #include "CCDB/Helpers/StringUtils.h"
+#include "CCDB/Providers/DataProvider.h"
+#include "RunRange.h"
 
-using namespace std;
 
 namespace ccdb {
 
@@ -22,18 +17,18 @@ class EventRange;
 class Variation;
 class RunRange;
 
-class Assignment: public ObjectsOwner, public StoredObject {
+class Assignment{
 public:
-	Assignment(ObjectsOwner * owner=NULL, DataProvider *provider=NULL);
-	virtual ~Assignment();
+
+	Assignment();
 
 	/** @brief creates mapped data by columns
-	 *
-	 * @param  mappedData
-	 * @param  columns
-	 * @return const vector<map<string,string> >
-	 */
-	static bool MapData(vector<map<string,string> > & mappedData, const vector<string>& data, const vector<string>& columns);
+         *
+         * @param  mappedData
+         * @param  columns
+         * @return const vector<map<string,string> >
+         */
+	static bool MapData(std::vector<std::map<std::string, std::string> > & mappedData, const vector<string>& data, const vector<string>& columns);
 	
 	/** @brief creates mapped data by columns
 	 * 
@@ -83,14 +78,11 @@ public:
 	int			    GetRequestedRun() const;			/// Run than was requested for user
 	void			SetRequestedRun(int val);			/// Run than was requested for user
 
-	RunRange *	    GetRunRange() const;		        /// Run range object, is NULL if not set
-	void            SetRunRange(RunRange * val);		/// Run range object, is NULL if not set
+	RunRange  	    GetRunRange() const;		        /// Run range object, is NULL if not set
+	void            SetRunRange(RunRange val);		/// Run range object, is NULL if not set
 
-	EventRange *	GetEventRange() const;			    /// Event range object, is NULL if not set
-	void			SetEventRange(EventRange * val);    /// Event range object, is NULL if not set
-
-	Variation *	    GetVariation() const;               /// Variation object, is NULL if not set
-	void			SetVariation(Variation * val);		/// Variation object, is NULL if not set
+	std::shared_ptr<Variation>  	    GetVariation() const;               /// Variation object, is NULL if not set
+	void			SetVariation(const std::shared_ptr<Variation>& val);		/// Variation object, is NULL if not set
 
 	int		GetId() const { return mId;	} /// id in database
 	void	SetId(int val) { mId = val; } /// id in database
@@ -123,8 +115,8 @@ public:
 	std::string GetComment() const { return mComment;} ///Comment of assignment
 	void SetComment(std::string val) {mComment = val;} ///Comment of assignment
 	
-	void SetTypeTable(ConstantsTypeTable* typeTable) { this->mTypeTable = typeTable;}
-	ConstantsTypeTable* GetTypeTable() const { return mTypeTable; }
+	void SetTypeTable(ConstantsTypeTable typeTable) { mTypeTable = typeTable;}
+	ConstantsTypeTable GetTypeTable() const { return mTypeTable; }
 
 	string GetValue(size_t columnIndex);
 	string GetValue(size_t rowIndex, size_t columnIndex);
@@ -161,14 +153,14 @@ public:
 	bool GetValueBool(string columnName)                   { return StringUtils::ParseBool(GetValue(columnName)); }
 	bool GetValueBool(size_t rowIndex, string columnName)  { return StringUtils::ParseBool(GetValue(rowIndex, columnName)); }
 
-	ConstantsTypeColumn::ColumnTypes GetValueType(size_t columnIndex) { return mTypeTable->GetColumns()[columnIndex]->GetType(); }
+	ConstantsTypeColumn::ColumnTypes GetValueType(size_t columnIndex) { return mTypeTable.GetColumns()[columnIndex].GetType(); }
 	ConstantsTypeColumn::ColumnTypes GetValueType(const string& columnName);
 
 	/** Gets number or rows */
-	size_t GetRowsCount() const { return mTypeTable->GetRowsCount(); }
+	size_t GetRowsCount() const { return mTypeTable.GetRowsCount(); }
 
 	/** Gets number of columns */
-	size_t GetColumnsCount() const { return mTypeTable->GetColumnsCount(); }
+	size_t GetColumnsCount() const { return mTypeTable.GetColumnsCount(); }
 private:
 
 	vector<map<string,string> > mRows;	// cache for blob data by rows
@@ -181,10 +173,9 @@ private:
 	unsigned int mEventRangeId;			// event range ID
     unsigned int mColumnCount;          // number of columns
 	int	mRequestedRun;					// Run than was requested for user
-	RunRange *mRunRange;				// Run range object, is NULL if not set
-	EventRange *mEventRange;			// Event range object, is NULL if not set
-	Variation *mVariation;				// Variation object, is NULL if not set
-	ConstantsTypeTable * mTypeTable;	// Constants table
+	RunRange mRunRange;				// Run range object, is NULL if not set
+	std::shared_ptr<Variation> mVariation;				// Variation object, is NULL if not set
+	ConstantsTypeTable mTypeTable;	// Constants table
 	
 	time_t mCreatedTime;				// time of creation
 	time_t mModifiedTime;				// time of last modification
@@ -192,8 +183,7 @@ private:
 
 	vector<string> mVectorData;         // Vectorized blob
 
-	Assignment(const Assignment& rhs);	
-	Assignment& operator=(const Assignment& rhs);
+
 };
 
 }

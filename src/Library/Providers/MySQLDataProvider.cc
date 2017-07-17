@@ -5,6 +5,7 @@
 #include <time.h>
 #include <string.h>
 #include <limits.h>
+#include <memory>
 
 #include "CCDB/Globals.h"
 #include "CCDB/Log.h"
@@ -28,13 +29,13 @@ using namespace ccdb;
 ccdb::MySQLDataProvider::MySQLDataProvider(void)
 {
 	mIsConnected = false;
-	mMySQLHnd=NULL;
-	mResult=NULL;
-	mRootDir = new Directory(this, this);
+	mMySQLHnd = nullptr;
+	mResult = nullptr;
+	mRootDir = std::make_shared<Directory>();
 	mDirsAreLoaded = false;
 	mLastFullQuerry="";
 	mLastShortQuerry="";
-    mLastVariation = NULL; 
+    mLastVariation = nullptr;
     
 }
 
@@ -46,9 +47,7 @@ ccdb::MySQLDataProvider::~MySQLDataProvider(void)
 		Disconnect();
 	}
 }
-#pragma endregion constructors
 
-#pragma region Connection
 
 bool ccdb::MySQLDataProvider::Connect( std::string connectionString )
 {
@@ -230,19 +229,15 @@ bool ccdb::MySQLDataProvider::CheckConnection( const string& errorSource/*=""*/ 
 	}
 	return true;
 }
-#pragma endregion Connection
-
-#pragma region Directories
 
 
-
-Directory* ccdb::MySQLDataProvider::GetDirectory( const string& path )
+std::shared_ptr<Directory> ccdb::MySQLDataProvider::GetDirectory( const string& path )
 {
 	return DataProvider::GetDirectory(path);
 }
 
 
-bool ccdb::MySQLDataProvider::SearchDirectories( vector<Directory *>& resultDirectories, const string& searchPattern, const string& parentPath/*=""*/,  int take/*=0*/, int startWith/*=0*/ )
+bool ccdb::MySQLDataProvider::SearchDirectories( std::vector<std::shared_ptr<Directory>>& resultDirectories, const string& searchPattern, const string& parentPath/*=""*/,  int take/*=0*/, int startWith/*=0*/ )
 {	
 	UpdateDirectoriesIfNeeded(); //do we need to update directories?
 
@@ -259,8 +254,8 @@ bool ccdb::MySQLDataProvider::SearchDirectories( vector<Directory *>& resultDire
 		
 		//If parent directory is "/" this should work too, because it have an id=0
 		//and tables in db which doesn't have parents should have parentId=0
-		
-		Directory *parentDir;
+
+		std::shared_ptr<Directory> parentDir;
 		if( (parentDir = GetDirectory(parentPath.c_str())) )
 		{
 			parentAddon = StringUtils::Format(" AND `parentId` = '%i'", parentDir->GetId());
@@ -291,7 +286,7 @@ bool ccdb::MySQLDataProvider::SearchDirectories( vector<Directory *>& resultDire
 		dbkey_t id = ReadIndex(0); //read db index key
 
 		//search for such index
-		map<dbkey_t,Directory *>::iterator dirIter = mDirectoriesById.find(id);
+		auto dirIter = mDirectoriesById.find(id);
 		if(dirIter != mDirectoriesById.end())
 		{
 			resultDirectories.push_back(dirIter->second);
@@ -323,16 +318,15 @@ bool ccdb::MySQLDataProvider::LoadDirectories()
 		mDirectoriesById.clear();
 
 		//clear root directory (delete all directory structure objects)
-		mRootDir->DisposeSubdirectories(); 
 		mRootDir->SetFullPath("/");
 
 		//Ok! We querryed our directories! lets catch them! 
 		while(FetchRow())
 		{
-			Directory *dir = new Directory(this, this);
+			auto dir = std::make_shared<Directory>(12);
 			dir->SetId(ReadIndex(0));					// `id`, 
 			dir->SetName(ReadString(1));			// `name`, 
-			dir->SetParentId(ReadInt(2));			// `parentId`, 
+			dir->SetParentId(ReadInt(2));			// `parentId`,
 			dir->SetModifiedTime(ReadUnixTime(3));	// UNIX_TIMESTAMP(`directories`.`updateTime`) as `updateTime`, 
 			dir->SetComment(ReadString(4));			// `comment`
 
@@ -349,7 +343,7 @@ bool ccdb::MySQLDataProvider::LoadDirectories()
 
 
 //______________________________________________________________________________
-vector<Directory *> ccdb::MySQLDataProvider::SearchDirectories( const string& searchPattern, const string& parentPath/*=""*/, int startWith/*=0*/, int select/*=0*/ )
+vector<std::shared_ptr<Directory>> ccdb::MySQLDataProvider::SearchDirectories( const string& searchPattern, const string& parentPath/*=""*/, int startWith/*=0*/, int select/*=0*/ )
 {
     /** @brief SearchDirectories
      *
@@ -363,7 +357,7 @@ vector<Directory *> ccdb::MySQLDataProvider::SearchDirectories( const string& se
      * paging could be done with @see startWith  @see take
      * startWith=0 and take=0 means select all records;
      *
-     * objects that are contained in vector<DDirectory *>& resultDirectories will be
+     * objects that are contained in vector<Dstd::shared_ptr<Directory>>& resultDirectories will be
      * 1) if this provider owned - deleted (@see ReleaseOwnership)
      * 2) if not owned - just leaved on user control
      * @param  [in]  searchPattern      Pattern to search
@@ -394,17 +388,17 @@ void ccdb::MySQLDataProvider::IsStoredObjectsOwner(bool flag)
 
 #pragma endregion ObjectOwnerMethods
 
-#pragma region Type Tables
-ConstantsTypeTable * ccdb::MySQLDataProvider::GetConstantsTypeTable( const string& name, Directory *parentDir,bool loadColumns/*=false*/ )
+
+ConstantsTypeTable ccdb::MySQLDataProvider::GetConstantsTypeTable(const string& name, std::shared_ptr<Directory> parentDir, bool loadColumns/*=false*/ )
 {
 	ClearErrors(); //Clear error in function that can produce new ones
 
 	//check the directory is ok
-	if(parentDir == NULL || parentDir->GetId()<=0)
+	if(parentDir == nullptr  || parentDir->GetId()<=0)
 	{
 		//error
 		Error(CCDB_ERROR_NO_PARENT_DIRECTORY,"MySQLDataProvider::GetConstantsTypeTable", "Parent directory is null or have invalid ID");
-		return NULL;
+		return nullptr;
 	}
 
 	//check connection
@@ -412,7 +406,7 @@ ConstantsTypeTable * ccdb::MySQLDataProvider::GetConstantsTypeTable( const strin
 	{
 		//error !not connect
 		Error(CCDB_ERROR_NOT_CONNECTED,"MySQLDataProvider::GetConstantsTypeTable", "Provider is not connected to MySQL.");
-		return NULL;
+		return nullptr;
 	}
 	
 	string query = StringUtils::Format("SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `directoryId`, `nRows`, `nColumns`, `comment` FROM `typeTables` WHERE `name` = '%s' AND `directoryId` = '%i';",
@@ -422,7 +416,7 @@ ConstantsTypeTable * ccdb::MySQLDataProvider::GetConstantsTypeTable( const strin
 	if(!QuerySelect(query))
 	{
 		//TODO: report error
-		return NULL;
+		return nullptr;
 	}
 
 	
@@ -430,190 +424,72 @@ ConstantsTypeTable * ccdb::MySQLDataProvider::GetConstantsTypeTable( const strin
 	if(!FetchRow())
 	{
 		//TODO error not selected
-		return NULL;
+		return nullptr;
 	}
 
 	//ok lets read the data...
-	ConstantsTypeTable *result = new ConstantsTypeTable(this, this);
-	result->SetId(ReadULong(0));
-	result->SetCreatedTime(ReadUnixTime(1));
-	result->SetModifiedTime(ReadUnixTime(2));
-	result->SetName(ReadString(3));
-	result->SetDirectoryId(ReadULong(4));
-	result->SetNRows(ReadInt(5));
-	result->SetNColumnsFromDB(ReadInt(6));
-	result->SetComment(ReadString(7));
-	
-	SetObjectLoaded(result); //set object flags that it was just loaded from DB
-	
-	result->SetDirectory(parentDir);
+	ConstantsTypeTable result;
+	result.SetId(ReadULong(0));
+	result.SetCreatedTime(ReadUnixTime(1));
+	result.SetModifiedTime(ReadUnixTime(2));
+	result.SetName(ReadString(3));
+	result.SetDirectoryId(ReadULong(4));
+	result.SetNRows(ReadInt(5));
+	result.SetNColumnsFromDB(ReadInt(6));
+	result.SetComment(ReadString(7));
+
+
 
 	//some validation of loaded record...
-	if(result->GetName() == "")
+	if(result.GetName() == "")
 	{
 		//TODO error, name should be not null and not empty
-		Error(CCDB_ERROR_TYPETABLE_HAS_NO_NAME,"MySQLDataProvider::GetConstantsTypeTable", "");
+		Error(CCDB_ERROR_TYPETABLE_HAS_NO_NAME,mClassName+__func__, "");
 		delete result;
 		return NULL;
 	}
 	
 	//Ok set a full path for this constant...
-	result->SetFullPath(PathUtils::CombinePath(parentDir->GetFullPath(), result->GetName()));
+	result.SetFullPath(PathUtils::CombinePath(parentDir->GetFullPath(), result.GetName()));
 
 	
 	FreeMySQLResult();
 	
 	//load columns if needed
-	if(loadColumns) LoadColumns(result);
+	if(loadColumns) LoadColumns(&result);
         
 
 	return result;
 }
 
 //______________________________________________________________________________
-ConstantsTypeTable * ccdb::MySQLDataProvider::GetConstantsTypeTable(const string& path, bool loadColumns/*=false*/ )
+ConstantsTypeTable ccdb::MySQLDataProvider::GetConstantsTypeTable(const string& path, bool loadColumns/*=false*/ )
 {
 	return DataProvider::GetConstantsTypeTable(path, loadColumns);
 }
 
 
-bool ccdb::MySQLDataProvider::GetConstantsTypeTables( vector<ConstantsTypeTable *>& resultTypeTables, const string&  parentDirPath, bool loadColumns/*=false*/ )
-{
-	//and directory
-	Directory *dir = GetDirectory(parentDirPath);
-
-	//probably one may wish to check dir to be !=NULL,
-	//but such check is in GetConstantsTypeHeaders( DDirectory *parentDir, vector<ConstantsTypeTable *>& consts );
-	return GetConstantsTypeTables(resultTypeTables, dir);
-}
-
-
-bool ccdb::MySQLDataProvider::GetConstantsTypeTables(  vector<ConstantsTypeTable *>& resultTypeTables, Directory *parentDir, bool loadColumns/*=false*/)
+std::vector<ConstantsTypeTable> ccdb::MySQLDataProvider::GetAllTypeTables(bool loadColumns/*=false*/)
 {
 	ClearErrors(); //Clear error in function that can produce new ones
 
-	//check the directory is ok
-	if((parentDir == NULL || parentDir->GetId()<=0) && (parentDir!=mRootDir))
-	{
-		//TODO error
-		Error(CCDB_ERROR_NO_PARENT_DIRECTORY,"MySQLDataProvider::GetConstantsTypeTables", "Parent directory is null or has invald ID");
-		return false;
-	}
-	
-	//Ok, lets cleanup result list
-		resultTypeTables.clear(); //we clear the consts. Considering that some one else should handle deletion
+    std::vector<ConstantsTypeTable> typeTables;
 
-	string query = StringUtils::Format("SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `directoryId`, `nRows`, `nColumns`, `comment` FROM `typeTables` WHERE `directoryId` = '%i';",
-		/*`directoryId`*/ parentDir->GetId());
-
-	if(!QuerySelect(query))
-	{
-		//no report error
-		return false;
-	}
-
-	//Ok! We querryed our directories! lets catch them! 
-	while(FetchRow())
-	{
-		//ok lets read the data...
-		ConstantsTypeTable *result = new ConstantsTypeTable(this, this);
-		result->SetId(ReadIndex(0));
-		result->SetCreatedTime(ReadUnixTime(1));
-		result->SetModifiedTime(ReadUnixTime(2));
-		result->SetName(ReadString(3));
-		result->SetDirectoryId(ReadULong(4));
-		result->SetNRows(ReadInt(5));
-		result->SetNColumnsFromDB(ReadInt(6));
-		result->SetComment(ReadString(7));
-		
-		if(loadColumns) LoadColumns(result);
-		result->SetDirectory(parentDir);
-		
-		SetObjectLoaded(result); //set object flags that it was just loaded from DB
-		resultTypeTables.push_back(result);
-	}
-
-	FreeMySQLResult();
-
-	return true;
-}
-
-
-vector<ConstantsTypeTable *> ccdb::MySQLDataProvider::GetConstantsTypeTables( const string& parentDirPath, bool loadColumns/*=false*/ )
-{
-	vector<ConstantsTypeTable *> tables;
-	GetConstantsTypeTables(tables, parentDirPath, loadColumns);
-	return tables;
-}
-
-
-vector<ConstantsTypeTable *> ccdb::MySQLDataProvider::GetConstantsTypeTables( Directory *parentDir, bool loadColumns/*=false*/ )
-{
-	
-		vector<ConstantsTypeTable *> tables;
-		GetConstantsTypeTables(tables, parentDir, loadColumns);
-		return tables;
-	
-}
-
-
-
-bool ccdb::MySQLDataProvider::SearchConstantsTypeTables( vector<ConstantsTypeTable *>& typeTables, const string& pattern, const string& parentPath /*= ""*/, bool loadColumns/*=false*/, int take/*=0*/, int startWith/*=0 */ )
-{
-	ClearErrors(); //Clear error in function that can produce new ones
-
-	// in MYSQL compared to wildcards % is * and _ is 
-	// convert it. 
-	string likePattern = WilcardsToLike(pattern);
-    
-	//do we need to search only in specific directory?
-	string parentAddon("");         //this addition is to query with right parent directory
-	Directory *parentDir = NULL;    //we will need it later anyway
-	if(parentPath!="")
-	{	
-        //we must take care of parent path!
-        if((parentDir = GetDirectory(parentPath.c_str())))
-        {
-            parentAddon = StringUtils::Format(" AND `directoryId` = '%i'", parentDir->GetId());
-        }
-        else
-        {
-            //request was made for directory that doesn't exits
-            //TODO place warning or not?
-            Error(CCDB_ERROR_DIRECTORY_NOT_FOUND,"MySQLDataProvider::SearchConstantsTypeTables", "Path to search is not found");
-            return false;
-        }
-    }
-    else
-    {
-        //In this case we will need mDirectoriesById
-        //maybe we need to update our directories?
-        UpdateDirectoriesIfNeeded();
-    }
-	    
-	//Ok, lets cleanup result list
-	if(typeTables.size()>0)
-	{
-		vector<ConstantsTypeTable *>::iterator iter = typeTables.begin();
-		while(iter != typeTables.end())
-		{
-			ConstantsTypeTable *obj = *iter;
-			if(IsOwner(obj) ) delete obj;		//delete objects if this provider is owner
-			iter++;	
-		}
-	}
-	typeTables.clear(); //we clear the consts. Considering that some one else  should handle deletion
-
-	string limitAddon = PrepareLimitInsertion(take, startWith);
+    //maybe we need to update our directories?
+    UpdateDirectoriesIfNeeded();
     
 	//combine query
-	string query = StringUtils::Format("SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `directoryId`, `nRows`, `nColumns`, `comment` FROM `typeTables` WHERE `name` LIKE '%s' %s ORDER BY `name` %s;",
-		likePattern.c_str(), parentAddon.c_str(), limitAddon.c_str());
+	string query("SELECT `id`,"
+				 " UNIX_TIMESTAMP(`created`) as `created`, "
+                 " UNIX_TIMESTAMP(`modified`) as `modified`, "
+                 " `name`, `directoryId`, `nRows`, `nColumns`, `comment` "
+                 " FROM `typeTables` ORDER BY `name`");
         
 	if(!QuerySelect(query))
 	{
 		//no report error
-		return false;
+        FreeMySQLResult();
+		return typeTables;
 	}
 
     
@@ -621,52 +497,37 @@ bool ccdb::MySQLDataProvider::SearchConstantsTypeTables( vector<ConstantsTypeTab
 	while(FetchRow())
 	{
 		//ok lets read the data...
-		ConstantsTypeTable *result = new ConstantsTypeTable(this, this);
+		ConstantsTypeTable result;
 
-		result->SetId(ReadULong(0));
-		result->SetCreatedTime(ReadUnixTime(1));
-		result->SetModifiedTime(ReadUnixTime(2));
-		result->SetName(ReadString(3));
-		result->SetDirectoryId(ReadULong(4));
-		result->SetNRows(ReadInt(5));
-		result->SetNColumnsFromDB(ReadInt(6));
-		result->SetComment(ReadString(7));
+		result.SetId(ReadULong(0));
+		result.SetCreatedTime(ReadUnixTime(1));
+		result.SetModifiedTime(ReadUnixTime(2));
+		result.SetName(ReadString(3));
+		result.SetDirectoryId(ReadULong(4));
+		result.SetNRows(ReadInt(5));
+		result.SetNColumnsFromDB(ReadInt(6));
+		result.SetComment(ReadString(7));
 
-        if(parentDir) //we already may have parrent directory
-        {
-		    result->SetDirectory(parentDir);
-        }
-        else //Or we should find it...
-        {
-            result->SetDirectory(mDirectoriesById[result->GetDirectoryId()]);
-        }
+        result.SetDirectory(mDirectoriesById[result.GetDirectoryId()]);
 
-		SetObjectLoaded(result); //set object flags that it was just loaded from DB
-		
 		typeTables.push_back(result);
 	}
 
     //Load COLUMNS if needed...
 	if(loadColumns)
     {
-        for (int i=0; i< typeTables.size(); i++)
+        for (auto &typeTable : typeTables)
         {
-            LoadColumns(typeTables[i]);
+            LoadColumns(&typeTable);
         }   
     }
     
 	FreeMySQLResult();
 	
-	return true;
+	return typeTables;
 }
 
 
-std::vector<ConstantsTypeTable *> ccdb::MySQLDataProvider::SearchConstantsTypeTables( const string& pattern, const string& parentPath /*= ""*/, bool loadColumns/*=false*/, int take/*=0*/, int startWith/*=0 */ )
-{
-	std::vector<ConstantsTypeTable *> tables;
-	SearchConstantsTypeTables(tables, pattern, parentPath,loadColumns, take, startWith);
-	return tables;
-}
 
 bool ccdb::MySQLDataProvider::LoadColumns( ConstantsTypeTable* table )
 {
@@ -694,16 +555,14 @@ bool ccdb::MySQLDataProvider::LoadColumns( ConstantsTypeTable* table )
 	while(FetchRow())
 	{
 		//ok lets read the data...
-		ConstantsTypeColumn *result = new ConstantsTypeColumn(table, this);
-		result->SetId(ReadULong(0));				
-		result->SetCreatedTime(ReadUnixTime(1));
-		result->SetModifiedTime(ReadUnixTime(2));
-		result->SetName(ReadString(3));
-		result->SetType(ReadString(4));
-		result->SetComment(ReadString(5));
-		result->SetDBTypeTableId(table->GetId());
-
-		SetObjectLoaded(result); //set object flags that it was just loaded from DB
+		ConstantsTypeColumn result;
+		result.SetId(ReadULong(0));
+		result.SetCreatedTime(ReadUnixTime(1));
+		result.SetModifiedTime(ReadUnixTime(2));
+		result.SetName(ReadString(3));
+		result.SetType(ReadString(4));
+		result.SetComment(ReadString(5));
+		result.SetDBTypeTableId(table->GetId());
 
 		table->AddColumn(result);
 	}
@@ -712,285 +571,10 @@ bool ccdb::MySQLDataProvider::LoadColumns( ConstantsTypeTable* table )
 
 	return true;
 }
-#pragma endregion Type Tables
-
-#pragma region Run ranges
 
 
 
-RunRange* ccdb::MySQLDataProvider::GetRunRange( int min, int max, const string& name /*= ""*/ )
-{
-	//build query
-	string query = "SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `runMin`, `runMax`,  `comment`"
-	               " FROM `runRanges` WHERE `runMin`='%i' AND `runMax`='%i' AND `name`=\"%s\"";
-	query = StringUtils::Format(query.c_str(), min, max, name.c_str());
-	
-	//query this
-	if(!QuerySelect(query))
-	{
-		//NO report error
-		return NULL;
-	}
-	
-	//Ok! We queried our run range! lets catch it! 
-	
-	if(!FetchRow())
-	{
-		//nothing was selected
-		return NULL;
-	}
-
-	//ok lets read the data...
-	RunRange *result = new RunRange(this, this);
-	result->SetId(ReadULong(0));
-	result->SetCreatedTime(ReadUnixTime(1));
-	result->SetModifiedTime(ReadUnixTime(2));
-	result->SetName(ReadString(3));
-	result->SetMin(ReadInt(4));
-	result->SetMax(ReadInt(5));
-	result->SetComment(ReadString(6));
-	
-	if(mReturnedRowsNum>1)
-	{
-		//TODO warning not uniq row
-		Error(CCDB_ERROR,"MySQLDataProvider::GetRunRange", "Run range with such min, max and name is not alone in the DB");
-	}
-
-	FreeMySQLResult();
-	return result;
-}
-
-
-RunRange* ccdb::MySQLDataProvider::GetRunRange( const string& name )
-{
-	ClearErrors(); //Clear error in function that can produce new ones
-
-	//build query
-	string query = "SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `runMin`, `runMax`,  `comment`"
-		" FROM `runRanges` WHERE `name`=\"%s\"";
-	query = StringUtils::Format(query.c_str(), name.c_str());
-
-	//query this
-	if(!QuerySelect(query))
-	{
-		//NO report error
-		return NULL;
-	}
-
-	//Ok! We querried our run range! lets catch it! 
-	if(!FetchRow())
-	{
-		//nothing was selected
-		return NULL;
-	}
-
-	//ok lets read the data...
-	RunRange *result = new RunRange(this, this);
-	result->SetId(ReadULong(0));
-	result->SetCreatedTime(ReadUnixTime(1));
-	result->SetModifiedTime(ReadUnixTime(2));
-	result->SetName(ReadString(3));
-	result->SetMin(ReadInt(4));
-	result->SetMax(ReadInt(5));
-	result->SetComment(ReadString(6));
-
-	if(mReturnedRowsNum>1)
-	{
-		//warning not uniq row
-		Error(CCDB_ERROR,"MySQLDataProvider::GetRunRange", "Run range with such name is not alone in the DB");
-	}
-
-	FreeMySQLResult();
-	return result;
-}
-
-
-bool ccdb::MySQLDataProvider::GetRunRanges(vector<RunRange*>& resultRunRanges, ConstantsTypeTable* table, const string& variation/*=""*/, int take/*=0*/, int startWith/*=0*/)
-{
-	ClearErrors(); //Clear error in function that can produce new ones
-
-	if(!CheckConnection("MySQLDataProvider::GetRunRanges(vector<DRunRange*>& resultRunRanges, ConstantsTypeTable* table, int take, int startWith)")) return false;
-	
-	//validate table
-	if(!table || !table->GetId())
-	{
-		//TODO report error
-		Error(CCDB_ERROR_NO_TYPETABLE,"MySQLDataProvider::GetRunRanges", "Type table is null or have invalid id");
-		return false;
-	}
-	//variation handle
-	string variationWhere("");
-	if(variation != "")
-	{
-		variationWhere.assign(StringUtils::Format(" AND `variations`.`name`=\"%s\" ", variation.c_str()));
-	}
-
-	//limits handle 
-	string limitInsertion = PrepareLimitInsertion(take, startWith);
-	
-	//Ok, lets cleanup result list
-	if(resultRunRanges.size()>0)
-	{
-		vector<RunRange *>::iterator iter = resultRunRanges.begin();
-		while(iter != resultRunRanges.end())
-		{
-			RunRange *obj = *iter;
-			if(IsOwner(obj)) delete obj;		//delete objects if this provider is owner
-			iter++;
-		}
-	}
-	resultRunRanges.clear(); //we clear the consts. Considering that some one else should handle deletion
-
-
-	//ok now we must build our mighty query...
-	string query= 
-		" SELECT "
-		" DISTINCT `runRanges`.`id` as `id`, "
-		" UNIX_TIMESTAMP(`runRanges`.`created`) as `created`, "
-		" UNIX_TIMESTAMP(`runRanges`.`modified`) as `modified`, "
-		" `runRanges`.`name` as `name`, "
-		" `runRanges`.`runMin` as `runMin`, "
-		" `runRanges`.`runMax` as `runMax`, "
-		"`runRanges`.`comment` as `comment` "
-		" FROM `typeTables` "
-		" INNER JOIN `assignments` ON `assignments`.`runRangeId`= `runRanges`.`id` "
-		" INNER JOIN `variations` ON `assignments`.`variationId`= `variations`.`id` "
-		" INNER JOIN `constantSets` ON `assignments`.`constantSetId` = `constantSets`.`id` "
-		" INNER JOIN `typeTables` ON `constantSets`.`constantTypeId` = `typeTables`.`id` "
-		" WHERE `typeTables`.`id` = '%i' "
-		" %s "
-		" ORDER BY `runRanges`.`runMin` ASC	 %s";
-		
-	query=StringUtils::Format(query.c_str(), table->GetId(), variationWhere.c_str(), limitInsertion.c_str());
-	
-	//query this
-	if(!QuerySelect(query))
-	{
-		//TODO report error
-		return false;
-	}
-
-	//Ok! We querried our run range! lets catch it! 
-	while(FetchRow())
-	{
-		//ok lets read the data...
-		RunRange *result = new RunRange(this, this);
-		result->SetId(ReadULong(0));
-		result->SetCreatedTime(ReadUnixTime(1));
-		result->SetModifiedTime(ReadUnixTime(2));
-		result->SetName(ReadString(3));
-		result->SetMin(ReadInt(4));
-		result->SetMax(ReadInt(5));
-		result->SetComment(ReadString(7));
-		
-		SetObjectLoaded(result);
-		resultRunRanges.push_back(result);
-	}
-
-	FreeMySQLResult();
-	return true;
-}
-
-
-
-#pragma endregion Run ranges
-
-#pragma region Variations
-
-bool ccdb::MySQLDataProvider::GetVariations(vector<Variation*>& resultVariations, ConstantsTypeTable* table, int run, int take, int startWith)
-{
-	ClearErrors(); //Clear error in function that can produce new ones
-
-	if(!CheckConnection("MySQLDataProvider::GetRunRanges(vector<DRunRange*>& resultRunRanges, ConstantsTypeTable* table, int take, int startWith)")) return false;
-	
-	//validate table
-	if(!table || !table->GetId())
-	{
-		//TODO report error
-		Error(CCDB_ERROR_NO_TYPETABLE,"MySQLDataProvider::GetVariations", "Type table is null or empty");
-		return false;
-	}
-	
-	//run range handle
-	string runRangeWhere(""); //Where clause for run range
-	if(run != 0)
-	{		
-		runRangeWhere = StringUtils::Format(" AND `runRanges`.`runMin` <= '%i' AND `runRanges`.`runMax` >= '%i' ", run, run);
-	}
-
-	//limits handle 
-	string limitInsertion = PrepareLimitInsertion(take, startWith);
-	
-	//Ok, lets cleanup result list
-	if(resultVariations.size()>0)
-	{
-		vector<Variation *>::iterator iter = resultVariations.begin();
-		while(iter != resultVariations.end())
-		{
-			Variation *obj = *iter;
-			if(IsOwner(obj)) delete obj;		//delete objects if this provider is owner
-			iter++;
-		}
-	}
-	resultVariations.clear(); //we clear the consts. Considering that some one else should handle deletion
-
-
-	//ok now we must build our mighty query...
-	string query= 
-		" SELECT "
-		" DISTINCT `variations`.`id` as `varId`, "
-		" UNIX_TIMESTAMP(`variations`.`created`) as `created`, "
-		" UNIX_TIMESTAMP(`variations`.`modified`) as `modified`, "
-		" `variations`.`name` as `name`, "
-		" `variations`.`description` as `description`, "
-		" `variations`.`comment` as `comment` "
-		" FROM `runRanges` "
-		" INNER JOIN `assignments`  ON `assignments`.`runRangeId`= `runRanges`.`id` "
-		" INNER JOIN `variations`   ON `assignments`.`variationId`= `variations`.`id` "
-		" INNER JOIN `constantSets` ON `assignments`.`constantSetId` = `constantSets`.`id` "
-		" INNER JOIN `typeTables`   ON `constantSets`.`constantTypeId` = `typeTables`.`id` "
-		" WHERE `typeTables`.`id` = '%i' "
-		" %s "
-		" ORDER BY `runRanges`.`runMin` ASC	 %s";
-		
-	query=StringUtils::Format(query.c_str(), table->GetId(), runRangeWhere.c_str(), limitInsertion.c_str());
-	
-	//query this
-	if(!QuerySelect(query))
-	{
-		//TODO report error
-		return false;
-	}
-
-	//Ok! We querried our run range! lets catch it! 
-	while(FetchRow())
-	{
-		//ok lets read the data...
-		Variation *result = new Variation(this, this);
-		result->SetId(ReadULong(0));
-		result->SetCreatedTime(ReadUnixTime(1));
-		result->SetModifiedTime(ReadUnixTime(2));
-		result->SetName(ReadString(3));
-		result->SetDescription(ReadString(4));
-		result->SetComment(ReadString(5));
-		
-		SetObjectLoaded(result);
-		resultVariations.push_back(result);
-	}
-
-	FreeMySQLResult();
-	return true;
-}
-
-vector<Variation *> ccdb::MySQLDataProvider::GetVariations( ConstantsTypeTable *table, int run/*=0*/, int take/*=0*/, int startWith/*=0 */ )
-{
-	vector<Variation *> resultVariations;
-	GetVariations(resultVariations, table, run, take, startWith);
-	return resultVariations;
-}
-
-
-Variation* ccdb::MySQLDataProvider::GetVariation( const string& name )
+shared_ptr<Variation> ccdb::MySQLDataProvider::GetVariation(const string& name )
 {
 	ClearErrors(); //Clear error in function that can produce new ones
     if(mLastVariation!=NULL && mLastVariation->GetName()==name) return mLastVariation;
@@ -1003,7 +587,7 @@ Variation* ccdb::MySQLDataProvider::GetVariation( const string& name )
 * @param     const char * name
 * @return   DVariation*
 */
-Variation* ccdb::MySQLDataProvider::GetVariationById(int id)
+std::shared_ptr<Variation> ccdb::MySQLDataProvider::GetVariationById(int id)
 {
     if(mVariationsById.find(id) != mVariationsById.end()) return mVariationsById[id];
     
@@ -1014,11 +598,15 @@ Variation* ccdb::MySQLDataProvider::GetVariationById(int id)
 /**
 * Get variation by database request
 */
-Variation* ccdb::MySQLDataProvider::SelectVariation(const string& whereClause)
+void ccdb::MySQLDataProvider::EnsureVariationsLoaded()
 {
+    if(mVariationsAreLoaded)
     //TODO: Implement method
-    string query = "SELECT `id`, UNIX_TIMESTAMP(`created`) as `created`, UNIX_TIMESTAMP(`modified`) as `modified`, `name`, `description`, `comment`, `parentId`"
-        " FROM `variations` WHERE "+whereClause+";";
+    string query = "SELECT `id`, "
+                           "UNIX_TIMESTAMP(`created`) as `created`, "
+                           "UNIX_TIMESTAMP(`modified`) as `modified`, "
+                           "`name`, `description`, `comment`, `parentId`"
+        " FROM `variations`;";
 
     //query this
     if(!QuerySelect(query))
@@ -1048,8 +636,6 @@ Variation* ccdb::MySQLDataProvider::SelectVariation(const string& whereClause)
     {
         //TODO warning not uniq row
     }
-
-    result->SetOwner(this, true);
 
     mVariationsById[result->GetId()] = result;
     mLastVariation = result;
@@ -1435,7 +1021,7 @@ bool ccdb::MySQLDataProvider::FillAssignment(Assignment* assignment)
 		return false;
 	}
 
-	Directory *parent = mDirectoriesById[directoryId];
+	std::shared_ptr<Directory>parent = mDirectoriesById[directoryId];
 	
 	ConstantsTypeTable * table = GetConstantsTypeTable(typeTableName, parent, true);
 	if(!table)
@@ -1756,26 +1342,5 @@ dbkey_t ccdb::MySQLDataProvider::GetUserId( string userName )
 
 	if(id<=0) return 1;
 	return id;
-}
-
-
-std::string ccdb::MySQLDataProvider::PrepareLimitInsertion(  int take/*=0*/, int startWith/*=0*/ )
-{
-	if(startWith != 0 && take != 0) return StringUtils::Format(" LIMIT %i, %i ", startWith, take);
-	if(startWith != 0 && take == 0) return StringUtils::Format(" LIMIT %i, %i ", startWith, INFINITE_RUN);
-	if(startWith == 0 && take != 0) return StringUtils::Format(" LIMIT %i ", take);
-	
-	return string(); //No LIMIT at all, if run point is here it corresponds to if(startWith == 0 && take ==0 )
-}
-
-
-int ccdb::MySQLDataProvider::CountConstantsTypeTables(Directory *dir)
-{
-	/**
-	 * @brief This function counts number of type tables for a given directory 
-	 * @param [in] directory to look tables in
-	 * @return number of tables to return
-	 */
-	return 0;
 }
 

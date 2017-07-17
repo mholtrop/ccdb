@@ -13,7 +13,6 @@
 #include <iostream>
 #include <queue>
 
-#include "CCDB/Console.h"
 
 namespace ccdb
 {
@@ -26,10 +25,10 @@ public:
     /** @brief writes status
      *
      * @param     bool status
-     * @param     const string& description
+     * @param     const std::string& description
      * @return   void
      */
-    static void Status(bool status, const string& description);
+    static void Status(bool status, const std::string& description);
 
     /** @brief Logs error to stream
      *
@@ -38,7 +37,7 @@ public:
      * @param message   Message of the error
      * @return   void
      */
-    static void Error(int errorCode, const string& module, const string& message);
+    static void Error(int errorCode, const std::string& module, const std::string& message);
 
     /** @brief Logs Warning to stream
      *
@@ -47,14 +46,14 @@ public:
      * @param message   Message of the Warning
      * @return   void
      */
-    static void Warning(int errorCode, const string& module, const string& message);
+    static void Warning(int errorCode, const std::string& module, const std::string& message);
 
     /** @brief Logs Warning to stream
      *
      * @param message   Message
      * @return   void
      */
-    static void Message(const string& message);
+    static void Message(const std::string& message);
 
     /** @brief Logs Verbose message to stream
      *
@@ -64,30 +63,14 @@ public:
      * @param message   Message of the error
      * @return   void
      */
-    static void Verbose(const string& module, const string& message);
+    static void Verbose(const std::string& module, const std::string& message);
 
-    /** @brief
-     * SetStream
-     *
-     * @param     ostream * val
-     * @return   void
-     */
-    static void SetStream(ostream * val);
-
-    /** @brief Returns pointer to current stream
-     * GetStream
-     *
-     * @return   ostream *
-     */
-    static ostream *GetStream();
-
-    /** @brief return last error code
+        /** @brief return last error code
      *
      * @return   int
      */
     static int  GetLastError();
     
-    static void SetUseColors(bool useIt);
 
     static void SetErrorLevel(int level)
     {
@@ -98,15 +81,14 @@ public:
 protected:
 
 private:
-    Log() {}                               /// Private it can  not be called
-    Log(Log const&) {}                     /// copy constructor is private
-    Log& operator=(Log const&);            /// assignment operator is private
-    static Console msConsole;              /// standard output console
-    static Console msErrorConsole;         /// output for error reporting
-    static Console msMessageConsole;       /// Console for messages
-    static Console msVerboseConsole;       /// console for verbose messages
+    Log() = default;                        /// Private it can  not be called
+    Log(Log const& /*unused*/) = default;   /// copy constructor is private
+    Log& operator=(Log const&);             /// assignment operator is private
+
     static int msLastError;
     static int mErrorLevel; //0-fatal, 1 - error, 2 - warning, 3 - message, 4 - verbose
+    static std::ostream& mStdStream = std::cout;
+    static std::ostream& mErrStream = std::cerr;
 };
 }
 #endif // _Log_

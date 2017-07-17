@@ -3,53 +3,91 @@ project(CCDB_lib)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
+set(CCDB_INCLUDE ../../include/CCDB)
+
 include_directories("../../include")
 include_directories("../../include/SQLite")
 include_directories(${MYSQL_INCLUDE_DIR})
 
 set(SOURCE_FILES
 
-        #some global objects
-        "Console.cc"
+         # GLOBAL objects
+
+        "${CCDB_INCLUDE}/Log.h"
         "Log.cc"
+
+        "${CCDB_INCLUDE}/CCDBError.h"
         "CCDBError.cc"
-        "GlobalMutex.cc"
-        "IMutex.cc"
-        "ISyncObject.cc"
-        "PthreadMutex.cc"
-        "PthreadSyncObject.cc"
 
         #user api
+        "${CCDB_INCLUDE}/Calibration.h"
         "Calibration.cc"
+
+        "${CCDB_INCLUDE}/CalibrationGenerator.h"
         "CalibrationGenerator.cc"
+
+        "${CCDB_INCLUDE}/SQLiteCalibration.h"
         "SQLiteCalibration.cc"
 
-        #helper classes
-        "Helpers/StringUtils.cc"
-        "Helpers/PathUtils.cc"
-        "Helpers/WorkUtils.cc"
-        "Helpers/TimeProvider.cc"
-        "Model/ObjectsOwner.cc"
-        "Model/StoredObject.cc"
-        "Model/Assignment.cc"
-        "Model/ConstantsTypeColumn.cc"
-        "Model/ConstantsTypeTable.cc"
-        "Model/Directory.cc"
-        "Model/EventRange.cc"
-        "Model/RunRange.cc"
-        "Model/Variation.cc"
-        "Providers/DataProvider.cc"
-        "Providers/FileDataProvider.cc"
-        "Providers/SQLiteDataProvider.cc"
-        "Providers/IAuthentication.cc"
-        "Providers/EnvironmentAuthentication.cc"
-
-        #user api
+        "${CCDB_INCLUDE}/MySQLCalibration.h"
         "MySQLCalibration.cc"
 
-        #model and provider
-        "Providers/MySQLConnectionInfo.cc"
+        # HELPERS
+        "${CCDB_INCLUDE}/Helpers/StringUtils.h"
+        "Helpers/StringUtils.cc"
+
+        "${CCDB_INCLUDE}/Helpers/PathUtils.h"
+        "Helpers/PathUtils.cc"
+
+        "${CCDB_INCLUDE}/Helpers/WorkUtils.h"
+        "Helpers/WorkUtils.cc"
+
+        "${CCDB_INCLUDE}/Helpers/TimeProvider.h"
+        "Helpers/TimeProvider.cc"
+
+        # MODEL
+
+        "${CCDB_INCLUDE}/Model/Assignment.h"
+        "Model/Assignment.cc"
+
+        "${CCDB_INCLUDE}/Model/ConstantsTypeColumn.h"
+        "Model/ConstantsTypeColumn.cc"
+
+        "${CCDB_INCLUDE}/Model/ConstantsTypeTable.h"
+        "Model/ConstantsTypeTable.cc"
+
+        "${CCDB_INCLUDE}/Model/Directory.h"
+        "Model/Directory.cc"
+
+        "${CCDB_INCLUDE}/Model/RunRange.h"
+        "Model/RunRange.cc"
+
+        "${CCDB_INCLUDE}/Model/Variation.h"
+        "Model/Variation.cc"
+
+        # PROVIDERS
+        "${CCDB_INCLUDE}/Providers/DataProvider.h"
+        "Providers/DataProvider.cc"
+
+        "${CCDB_INCLUDE}/Providers/FileDataProvider.h"
+        "Providers/FileDataProvider.cc"
+
+        "${CCDB_INCLUDE}/Providers/SQLiteDataProvider.h"
+        "Providers/SQLiteDataProvider.cc"
+
+        "${CCDB_INCLUDE}/Providers/SQLiteDataProvider.h"
+        "Providers/SQLiteDataProvider.cc"
+
+        "${CCDB_INCLUDE}/Providers/MySQLDataProvider.h"
         "Providers/MySQLDataProvider.cc"
+
+        "${CCDB_INCLUDE}/Providers/MySQLConnectionInfo.h"
+        "Providers/MySQLConnectionInfo.cc"
+
+
+        #user api
+
+
 
         #for clion convenience
         ../../include/CCDB/Helpers/StopWatch.h
