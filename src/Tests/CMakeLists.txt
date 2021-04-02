@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(CCDB_tests)
+project(ccdb_tests)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
@@ -35,5 +35,5 @@ set(SOURCE_FILES
 
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT} CCDB_lib)
+target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT} ccdb)
 

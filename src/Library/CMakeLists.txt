@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(CCDB_lib)
+project(ccdb)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
@@ -56,7 +56,7 @@ set(SOURCE_FILES
 
 
 add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} ${MYSQL_LIB}  CCDB_sqlite)
+target_link_libraries(${PROJECT_NAME} ${MYSQL_LIB} ccdb_sqlite)
 
 
 # Required on Unix OS family to be able to be linked into shared libraries.
