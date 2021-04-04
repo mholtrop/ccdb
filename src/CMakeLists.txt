@@ -4,6 +4,9 @@ project(CCDB)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
     message(SEND_ERROR "In-source builds are not allowed.")
 endif ()
@@ -48,8 +51,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 
-
-INCLUDE(${CMAKE_SOURCE_DIR}/FindMySQL.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/FindMySQL.cmake)
 
 add_definitions(-DCCDB_MYSQL)
 
