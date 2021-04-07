@@ -77,7 +77,7 @@ target_include_directories(ccdb_static PUBLIC
                            )
 
 # Required on Unix OS family to be able to be linked into shared libraries.
-set_target_properties(ccdb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(ccdb_objs PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_compile_definitions(BIG_JOINS=1)
 add_compile_definitions(NDEBUG)

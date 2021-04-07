@@ -31,8 +31,7 @@ target_include_directories(ccdb_sqlite_static PUBLIC
 
 
 # Required on Unix OS family to be able to be linked into shared libraries.
-set_target_properties(ccdb_sqlite
-        PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(ccdb_sqlite_objs PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 #set(ccdb_sqlite_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include
 #        CACHE INTERNAL "ccdb_sqlite: Include Directories" FORCE)
